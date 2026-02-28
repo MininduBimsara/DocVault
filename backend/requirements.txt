@@ -1,0 +1,12 @@
+# DocVault Chat – Backend dependencies
+fastapi>=0.110,<1
+uvicorn[standard]>=0.29,<1
+python-dotenv>=1.0,<2
+
+# MongoDB
+motor>=3.3,<4
+
+# Auth
+passlib[bcrypt]>=1.7,<2
+PyJWT>=2.8,<3
+pydantic[email]>=2.0,<3
