@@ -1,0 +1,3 @@
+# This directory is the shared file-storage volume used by both services.
+# Neither service should store permanent data here yet — this folder
+# is created automatically at startup by docvault-api and docvault-rag.
