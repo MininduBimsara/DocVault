@@ -29,7 +29,12 @@ export async function uploadDocumentHandler(
     );
 
     res.status(201).json({ document });
-  } catch (err) {
+  } catch (err: unknown) {
+    // Surface known error codes (e.g. 502 from ingestion service failure)
+    if ((err as any).statusCode === 502) {
+      res.status(502).json({ error: (err as Error).message });
+      return;
+    }
     next(err);
   }
 }

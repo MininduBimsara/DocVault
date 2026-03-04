@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
 from app.routes.health import router as health_router
+from app.routes.ingest import router as ingest_router
 
 
 # ── Lifespan (startup / shutdown) ─────────────────────────────────────────────
@@ -57,3 +58,4 @@ app.add_middleware(
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 app.include_router(health_router, prefix="/health", tags=["health"])
+app.include_router(ingest_router, prefix="/ingest", tags=["ingest"])

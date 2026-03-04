@@ -9,6 +9,7 @@ const required = [
   "JWT_SECRET",
   "FRONTEND_ORIGIN",
   "RAG_SERVICE_URL",
+  "INTERNAL_RAG_KEY",
   "FILE_STORAGE_PATH",
 ] as const;
 
@@ -33,7 +34,7 @@ export const env = {
   FRONTEND_ORIGIN: process.env.FRONTEND_ORIGIN!,
   // Internal
   RAG_SERVICE_URL: process.env.RAG_SERVICE_URL!,
-  INTERNAL_RAG_KEY: process.env.INTERNAL_RAG_KEY ?? "",
+  INTERNAL_RAG_KEY: process.env.INTERNAL_RAG_KEY!,
   // Resolve relative to the config dir (two levels up to repo root)
   FILE_STORAGE_PATH: path.resolve(
     __dirname,

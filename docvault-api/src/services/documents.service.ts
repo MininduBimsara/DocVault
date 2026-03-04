@@ -11,6 +11,7 @@ import {
   ensureUserDir,
   removeFileSafe,
 } from "../utils/fileStorage";
+import { triggerIngest } from "../clients/rag.client";
 
 // ── Upload ────────────────────────────────────────────────────────────────────
 
@@ -18,15 +19,23 @@ import {
  * 1. Pre-generate a Mongo ObjectId — so we know the final file path upfront.
  * 2. Ensure the user directory exists on disk.
  * 3. Write the PDF buffer to FILE_STORAGE_PATH/{userId}/{docId}.pdf.
- * 4. Create the DB record in a single save with storage.path already set
- *    (satisfies Mongoose's required validator on first write).
- * 5. Patch mimeType, sizeBytes, and progress.stage onto the saved record.
- * 6. Return a safe summary — no storage.path exposed to the caller.
+ * 4. Create the DB record (status=UPLOADED).
+ * 5. Patch mimeType, sizeBytes onto the saved record.
+ * 6. Trigger FastAPI ingestion via POST /ingest.
+ *    - On success → update status to PROCESSING and progress.stage to "queued".
+ *    - On failure → keep status UPLOADED and throw a 502 upstream error.
+ * 7. Return a safe summary — no storage.path exposed to the caller.
  */
 export async function uploadDocument(
   userId: string,
   file: Express.Multer.File,
-) {
+): Promise<{
+  id: string;
+  fileName: string;
+  status: string;
+  progress: object;
+  createdAt: unknown;
+}> {
   // Step 1 — generate the _id upfront so the path is deterministic
   const docId = new Types.ObjectId();
   const docIdStr = String(docId);
@@ -47,7 +56,7 @@ export async function uploadDocument(
     storage: { provider: "local", path: filePath },
   });
 
-  // Step 5 — set mimeType, sizeBytes, progress.stage in-place
+  // Step 5 — set mimeType and sizeBytes
   await doc.updateOne({
     $set: {
       mimeType: file.mimetype,
@@ -56,14 +65,57 @@ export async function uploadDocument(
     },
   });
 
-  // Step 6 — return safe client-facing shape
-  return {
-    id: docIdStr,
-    fileName: doc.fileName,
-    status: doc.status,
-    progress: { stage: "uploaded" },
-    createdAt: (doc as any).createdAt,
-  };
+  // Step 6 — trigger FastAPI ingestion
+  try {
+    await triggerIngest({
+      userId,
+      docId: docIdStr,
+      filePath,
+      fileName: file.originalname,
+    });
+
+    // FastAPI accepted the job — mark as PROCESSING
+    await doc.updateOne({
+      $set: {
+        status: "PROCESSING",
+        "progress.stage": "queued",
+      },
+    });
+
+    console.log(`[upload] ingestion triggered docId=${docIdStr} → PROCESSING`);
+
+    return {
+      id: docIdStr,
+      fileName: doc.fileName,
+      status: "PROCESSING",
+      progress: { stage: "queued" },
+      createdAt: (doc as any).createdAt,
+    };
+  } catch (err: unknown) {
+    // Log error details — but never leak INTERNAL_RAG_KEY
+    const message = err instanceof Error ? err.message : String(err);
+    console.error(
+      `[upload] ingestion trigger failed docId=${docIdStr}: ${message}`,
+    );
+
+    // ── Rollback: remove the orphaned file and DB record ──────────────────
+    // Without this, every failed upload leaves a ghost UPLOADED document
+    // with no active ingestion pipeline attached to it.
+    try {
+      await removeFileSafe(filePath);
+      await deleteDoc(docIdStr);
+      console.warn(
+        `[upload] rolled back docId=${docIdStr} (file + DB record removed)`,
+      );
+    } catch (rollbackErr) {
+      console.error(`[upload] rollback failed docId=${docIdStr}:`, rollbackErr);
+    }
+
+    // Attach a 502 status code so the controller can surface it cleanly
+    const upstream: any = new Error("Ingestion service unavailable.");
+    upstream.statusCode = 502;
+    throw upstream;
+  }
 }
 
 // ── List ──────────────────────────────────────────────────────────────────────

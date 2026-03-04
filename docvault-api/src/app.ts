@@ -6,6 +6,7 @@ import healthRouter from "./routes/health.route";
 import authRouter from "./routes/auth.route";
 import protectedRouter from "./routes/protected.route";
 import documentsRouter from "./routes/documents.route";
+import internalRouter from "./routes/internal.route";
 
 const app = express();
 
@@ -28,6 +29,10 @@ app.use("/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/protected", protectedRouter);
 app.use("/api/documents", documentsRouter);
+
+// ── Internal service-to-service routes (not user-facing) ─────────────────────
+// Secured via INTERNAL_RAG_KEY header — see src/middleware/internalKey.middleware.ts
+app.use("/internal", internalRouter);
 
 // ── 404 fallback ──────────────────────────────────────────────────────────────
 app.use((_req, res) => {

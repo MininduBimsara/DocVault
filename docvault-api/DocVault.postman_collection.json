@@ -1,0 +1,604 @@
+{
+  "info": {
+    "name": "DocVault API",
+    "_postman_id": "docvault-api-collection-v1",
+    "description": "Complete Postman collection for the DocVault Express/TypeScript API (port 4000). Auth is cookie-based (HttpOnly cookie: docvault_token). Import this file into Postman and make sure 'Send cookies' is enabled. Step 5 adds the Internal folder for service-to-service progress webhooks.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000",
+      "type": "string"
+    },
+    {
+      "key": "docId",
+      "value": "",
+      "type": "string",
+      "description": "Set this to a document _id returned from the Upload or List endpoints."
+    },
+    {
+      "key": "internalRagKey",
+      "value": "change_me_shared_secret_sudda",
+      "type": "string",
+      "description": "Shared secret for internal service-to-service routes. Must match INTERNAL_RAG_KEY in both .env files."
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "description": "Service health check – no auth required.",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            },
+            "description": "GET /health — Returns { status: 'ok', service: 'docvault-api' }. No auth required."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"status\": \"ok\",\n  \"service\": \"docvault-api\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "description": "Registration, login, logout, and current-user endpoints. Login/Register set the `docvault_token` HttpOnly cookie automatically.",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Returns user object', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('user');",
+                  "  pm.expect(json.user).to.have.property('id');",
+                  "  pm.expect(json.user).to.have.property('email');",
+                  "  pm.expect(json.user).to.have.property('plan');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "POST /api/auth/register — Creates a new user account. Sets the `docvault_token` cookie. Returns the created user (id, email, plan, createdAt). Email must be unique and password >= 8 chars."
+          },
+          "response": [
+            {
+              "name": "201 Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"user\": {\n    \"id\": \"<mongo_object_id>\",\n    \"email\": \"test@example.com\",\n    \"plan\": \"FREE\",\n    \"createdAt\": \"2026-03-05T00:00:00.000Z\"\n  }\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "400 Validation Error",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"A valid email address is required\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "409 Email Already Registered",
+              "status": "Conflict",
+              "code": 409,
+              "body": "{\n  \"error\": \"Email is already registered\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns user object', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('user');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "POST /api/auth/login — Authenticates the user. Sets the `docvault_token` HttpOnly cookie (7 days). Returns the user object."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"user\": {\n    \"id\": \"<mongo_object_id>\",\n    \"email\": \"test@example.com\",\n    \"plan\": \"FREE\",\n    \"createdAt\": \"2026-03-05T00:00:00.000Z\"\n  }\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 Invalid Credentials",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Invalid email or password\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ok: true', () => {",
+                  "  pm.expect(pm.response.json().ok).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "POST /api/auth/logout — Clears the `docvault_token` cookie. Requires the cookie to be present (protected by requireAuth middleware). Returns { ok: true }."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"ok\": true\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 Not Authenticated",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Not authenticated\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Get Current User (me)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns user object', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('user');",
+                  "  pm.expect(json.user).to.have.property('id');",
+                  "  pm.expect(json.user).to.have.property('email');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "GET /api/auth/me — Returns the currently authenticated user from the JWT cookie. Requires auth."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"user\": {\n    \"id\": \"<mongo_object_id>\",\n    \"email\": \"test@example.com\"\n  }\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 Not Authenticated",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Not authenticated\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "description": "File upload, list, and delete endpoints. All require auth (docvault_token cookie).",
+      "item": [
+        {
+          "name": "Upload Document (PDF)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Returns document object', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('document');",
+                  "  pm.expect(json.document).to.have.property('id');",
+                  "  // Save docId for later use",
+                  "  pm.collectionVariables.set('docId', json.document.id);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select a PDF file from your machine. Only PDF files are accepted."
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents", "upload"]
+            },
+            "description": "POST /api/documents/upload — Uploads a PDF document for the authenticated user. Use form-data with field name `file`. Only PDF MIME type is accepted. Returns the created document record. The test script auto-saves `docId` to the collection variable."
+          },
+          "response": [
+            {
+              "name": "201 Created (PROCESSING)",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"document\": {\n    \"id\": \"<mongo_object_id>\",\n    \"fileName\": \"sample.pdf\",\n    \"status\": \"PROCESSING\",\n    \"progress\": { \"stage\": \"queued\" },\n    \"createdAt\": \"2026-03-05T00:00:00.000Z\"\n  }\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "400 No File / Wrong Type",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": \"No file uploaded. Use field name `file`.\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 Not Authenticated",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Not authenticated\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "502 Ingestion Service Unavailable",
+              "status": "Bad Gateway",
+              "code": 502,
+              "body": "{\n  \"error\": \"Ingestion service unavailable.\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "List Documents",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns documents array', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json).to.have.property('documents');",
+                  "  pm.expect(json.documents).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents"]
+            },
+            "description": "GET /api/documents — Returns all documents belonging to the authenticated user. Each document includes id, originalName, sizeBytes, mimeType, and createdAt."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"documents\": [\n    {\n      \"id\": \"<mongo_object_id>\",\n      \"userId\": \"<mongo_object_id>\",\n      \"originalName\": \"sample.pdf\",\n      \"storagePath\": \"../shared-storage/<userId>/sample.pdf\",\n      \"mimeType\": \"application/pdf\",\n      \"sizeBytes\": 102400,\n      \"createdAt\": \"2026-03-05T00:00:00.000Z\"\n    }\n  ]\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 Not Authenticated",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Not authenticated\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        },
+        {
+          "name": "Delete Document",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ok: true', () => {",
+                  "  pm.expect(pm.response.json().ok).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/documents/{{docId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "documents", "{{docId}}"]
+            },
+            "description": "DELETE /api/documents/:docId — Permanently deletes the document file and its database record. Only the owning user can delete their own documents. Use the `docId` collection variable (auto-set by the Upload test script), or manually paste a document ID."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"ok\": true\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"error\": \"Document not found.\"\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 Not Authenticated",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Not authenticated\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Protected",
+      "description": "Auth smoke-test endpoint. Verifies the JWT cookie is valid end-to-end.",
+      "item": [
+        {
+          "name": "Protected Ping",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ok: true', () => {",
+                  "  const json = pm.response.json();",
+                  "  pm.expect(json.ok).to.be.true;",
+                  "  pm.expect(json).to.have.property('user');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/protected/ping",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "protected", "ping"]
+            },
+            "description": "GET /api/protected/ping — A minimal auth-protected smoke test. Returns { ok: true, user: { id, email } } if the docvault_token cookie is valid. Use this to verify your auth cookie is being sent correctly."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"ok\": true,\n  \"user\": {\n    \"id\": \"<mongo_object_id>\",\n    \"email\": \"test@example.com\"\n  }\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "401 Not Authenticated",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Not authenticated\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Internal (Service-to-Service)",
+      "description": "Internal endpoints called by docvault-rag (FastAPI). These are NOT user-facing. All requests must include the INTERNAL_RAG_KEY header. Set the `internalRagKey` collection variable to your shared secret.",
+      "item": [
+        {
+          "name": "Post Progress Update",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('ok: true', () => {",
+                  "  pm.expect(pm.response.json().ok).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "INTERNAL_RAG_KEY",
+                "value": "{{internalRagKey}}",
+                "description": "Must match INTERNAL_RAG_KEY env var on the Express server."
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"stage\": \"chunk\",\n  \"chunksTotal\": 20,\n  \"chunksDone\": 5,\n  \"status\": \"PROCESSING\"\n}",
+              "options": {
+                "raw": { "language": "json" }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/internal/docs/{{docId}}/progress",
+              "host": ["{{baseUrl}}"],
+              "path": ["internal", "docs", "{{docId}}", "progress"]
+            },
+            "description": "POST /internal/docs/:docId/progress — Called by docvault-rag to push ingestion progress into Mongo. All body fields are optional. If `errorMessage` is set, `status` is forced to FAILED. Protected by INTERNAL_RAG_KEY header (constant-time comparison). The `docId` collection variable is auto-set when you run the Upload request."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"ok\": true\n}",
+              "_postman_previewlanguage": "json"
+            },
+            {
+              "name": "200 OK — Mark READY",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"ok\": true\n}",
+              "_postman_previewlanguage": "json",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "INTERNAL_RAG_KEY", "value": "{{internalRagKey}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"stage\": \"done\",\n  \"status\": \"READY\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/internal/docs/{{docId}}/progress",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["internal", "docs", "{{docId}}", "progress"]
+                }
+              }
+            },
+            {
+              "name": "200 OK — Report Failure",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"ok\": true\n}",
+              "_postman_previewlanguage": "json",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  { "key": "Content-Type", "value": "application/json" },
+                  { "key": "INTERNAL_RAG_KEY", "value": "{{internalRagKey}}" }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"stage\": \"failed\",\n  \"errorMessage\": \"PDF is corrupted\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/internal/docs/{{docId}}/progress",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["internal", "docs", "{{docId}}", "progress"]
+                }
+              }
+            },
+            {
+              "name": "401 Invalid Key",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": \"Invalid INTERNAL_RAG_KEY.\"\n}",
+              "_postman_previewlanguage": "json"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

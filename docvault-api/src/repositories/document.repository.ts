@@ -1,5 +1,6 @@
 import { Types } from "mongoose";
 import DocVaultDocument from "../models/document.model";
+import { DocumentStatus } from "../models/document.model";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -9,6 +10,15 @@ export interface CreateDocData {
   fileName: string;
   status: "UPLOADED";
   storage: { provider: "local"; path: string };
+}
+
+export interface UpdateDocProgressData {
+  stage?: string;
+  totalPages?: number;
+  chunksTotal?: number;
+  chunksDone?: number;
+  status?: DocumentStatus;
+  errorMessage?: string;
 }
 
 export interface UpdateDocStorageData {
@@ -86,4 +96,35 @@ export async function findDocById(docId: string, userId: string) {
  */
 export async function deleteDoc(docId: string) {
   return DocVaultDocument.findByIdAndDelete(docId);
+}
+
+/**
+ * Update a document's progress, status, and/or error fields.
+ * Called by the internal webhook endpoint when docvault-rag posts progress.
+ * Idempotent — repeated calls simply overwrite with the latest values.
+ */
+export async function updateDocProgress(
+  docId: string,
+  data: UpdateDocProgressData,
+): Promise<void> {
+  const $set: Record<string, unknown> = {};
+
+  if (data.stage !== undefined) $set["progress.stage"] = data.stage;
+  if (data.totalPages !== undefined)
+    $set["progress.totalPages"] = data.totalPages;
+  if (data.chunksTotal !== undefined)
+    $set["progress.chunksTotal"] = data.chunksTotal;
+  if (data.chunksDone !== undefined)
+    $set["progress.chunksDone"] = data.chunksDone;
+  if (data.status !== undefined) $set["status"] = data.status;
+
+  if (data.errorMessage !== undefined) {
+    $set["error.message"] = data.errorMessage;
+    $set["error.at"] = new Date();
+    $set["status"] = "FAILED";
+  }
+
+  if (Object.keys($set).length === 0) return; // nothing to update
+
+  await DocVaultDocument.findByIdAndUpdate(docId, { $set });
 }

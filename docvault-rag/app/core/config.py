@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     EMBEDDINGS_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     INTERNAL_RAG_KEY: str = ""
     FILE_STORAGE_PATH: str = "../shared-storage"
+    # URL of the Express API service (for webhook callbacks)
+    API_SERVICE_URL: str = "http://localhost:4000"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
