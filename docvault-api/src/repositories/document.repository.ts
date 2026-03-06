@@ -91,6 +91,15 @@ export async function findDocById(docId: string, userId: string) {
   }).lean();
 }
 
+export async function countOwnedDocsByIds(userId: string, docIds: string[]) {
+  if (docIds.length === 0) return 0;
+
+  return DocVaultDocument.countDocuments({
+    userId: new Types.ObjectId(userId),
+    _id: { $in: docIds.map((id) => new Types.ObjectId(id)) },
+  });
+}
+
 /**
  * Hard-delete a document record by its id.
  */

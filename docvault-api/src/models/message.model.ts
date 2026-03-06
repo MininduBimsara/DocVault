@@ -88,7 +88,7 @@ const MessageSchema = new Schema<IMessage>(
 // ── Indexes ───────────────────────────────────────────────────────────────────
 
 MessageSchema.index({ sessionId: 1, createdAt: 1 });
-MessageSchema.index({ userId: 1, createdAt: -1 });
+MessageSchema.index({ userId: 1, sessionId: 1, createdAt: -1 });
 
 // ── Model ─────────────────────────────────────────────────────────────────────
 
