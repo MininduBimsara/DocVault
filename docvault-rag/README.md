@@ -40,8 +40,10 @@ copy .env.example .env            # Windows
 | `CHROMA_PATH`          | `./chroma`                  | Local Chroma persistent store directory         |
 | `GEMINI_API_KEY`       | _(required)_                | Google Gemini API key                           |
 | `EMBEDDINGS_MODEL`     | `models/text-embedding-004` | Gemini embedding model                          |
+| `GEMINI_CHAT_MODEL`    | `models/gemini-1.5-flash`   | Gemini model used to generate chat answers      |
 | `EMBED_BATCH_SIZE`     | `25`                        | Chunks per Gemini embedding call                |
 | `EMBED_BATCH_DELAY_MS` | `200`                       | Milliseconds between embedding batches          |
+| `RETRIEVAL_TOP_K`      | `5`                         | Number of retrieved chunks for `/rag/chat`      |
 | `MIN_PAGE_CHARS`       | `50`                        | Skip PDF pages with fewer characters than this  |
 | `API_SERVICE_URL`      | `http://localhost:4000`     | Express base URL for progress webhook callbacks |
 
@@ -82,6 +84,28 @@ Triggers PDF ingestion.
 
 Returns immediately with `{ "ok": true, "message": "ingestion started" }`.  
 The pipeline runs in the background and posts progress to Express.
+
+### `POST /rag/chat`
+
+Internal RAG answering endpoint used by `docvault-api`.
+
+**Header:** `INTERNAL_RAG_KEY: <secret>`
+
+**Body:**
+
+```json
+{
+  "userId": "...",
+  "docIds": ["..."],
+  "history": [
+    { "role": "user", "content": "..." },
+    { "role": "assistant", "content": "..." }
+  ],
+  "question": "..."
+}
+```
+
+Retrieval is always filtered by both `userId` and `docIds` before generation.
 
 ---
 

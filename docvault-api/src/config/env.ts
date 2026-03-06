@@ -35,6 +35,7 @@ export const env = {
   // Internal
   RAG_SERVICE_URL: process.env.RAG_SERVICE_URL!,
   INTERNAL_RAG_KEY: process.env.INTERNAL_RAG_KEY!,
+  RAG_CHAT_TIMEOUT_MS: parseInt(process.env.RAG_CHAT_TIMEOUT_MS ?? "20000", 10),
   // Resolve relative to the config dir (two levels up to repo root)
   FILE_STORAGE_PATH: path.resolve(
     __dirname,

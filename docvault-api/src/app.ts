@@ -8,6 +8,7 @@ import protectedRouter from "./routes/protected.route";
 import documentsRouter from "./routes/documents.route";
 import internalRouter from "./routes/internal.route";
 import sessionsRouter from "./routes/sessions.route";
+import chatRouter from "./routes/chat.route";
 
 const app = express();
 
@@ -31,6 +32,7 @@ app.use("/api/auth", authRouter);
 app.use("/api/protected", protectedRouter);
 app.use("/api/documents", documentsRouter);
 app.use("/api/sessions", sessionsRouter);
+app.use("/api/chat", chatRouter);
 
 // ── Internal service-to-service routes (not user-facing) ─────────────────────
 // Secured via INTERNAL_RAG_KEY header — see src/middleware/internalKey.middleware.ts

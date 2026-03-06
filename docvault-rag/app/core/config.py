@@ -17,8 +17,10 @@ class Settings(BaseSettings):
     # ── Gemini / Embeddings ───────────────────────────────────────────────────
     GEMINI_API_KEY: str = ""                           # Required at runtime
     EMBEDDINGS_MODEL: str = "models/text-embedding-004"
+    GEMINI_CHAT_MODEL: str = "models/gemini-1.5-flash"
     EMBED_BATCH_SIZE: int = 25                         # chunks per Gemini call
     EMBED_BATCH_DELAY_MS: int = 200                    # ms delay between batches
+    RETRIEVAL_TOP_K: int = 5
 
     # ── PDF processing ────────────────────────────────────────────────────────
     MIN_PAGE_CHARS: int = 50                           # skip pages below this

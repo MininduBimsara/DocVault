@@ -30,14 +30,15 @@ curl http://localhost:4000/health
 
 ## Env Variables
 
-| Variable            | Required | Description                             |
-| ------------------- | -------- | --------------------------------------- |
-| `PORT`              | ✅       | Server port (default 4000)              |
-| `MONGO_URI`         | ❌       | MongoDB connection (placeholder)        |
-| `JWT_SECRET`        | ❌       | JWT signing secret (placeholder)        |
-| `RAG_SERVICE_URL`   | ✅       | Base URL of the docvault-rag service    |
-| `INTERNAL_RAG_KEY`  | ❌       | Shared secret for internal comms        |
-| `FILE_STORAGE_PATH` | ✅       | Relative path to the shared-storage dir |
+| Variable              | Required | Description                             |
+| --------------------- | -------- | --------------------------------------- |
+| `PORT`                | ✅       | Server port (default 4000)              |
+| `MONGO_URI`           | ❌       | MongoDB connection (placeholder)        |
+| `JWT_SECRET`          | ❌       | JWT signing secret (placeholder)        |
+| `RAG_SERVICE_URL`     | ✅       | Base URL of the docvault-rag service    |
+| `INTERNAL_RAG_KEY`    | ❌       | Shared secret for internal comms        |
+| `RAG_CHAT_TIMEOUT_MS` | ❌       | Timeout for internal `/rag/chat` calls  |
+| `FILE_STORAGE_PATH`   | ✅       | Relative path to the shared-storage dir |
 
 ## Scripts
 

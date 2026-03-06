@@ -7,8 +7,6 @@ Includes exponential back-off for rate-limit errors (up to 3 retries).
 
 import asyncio
 import logging
-import time
-from typing import Any
 
 import google.generativeai as genai
 
@@ -83,3 +81,25 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
             await asyncio.sleep(delay_s)
 
     return all_vectors
+
+
+def embed_query(query: str) -> list[float]:
+    """Embed one retrieval query using Gemini RETRIEVAL_QUERY mode."""
+    result = genai.embed_content(
+        model=settings.EMBEDDINGS_MODEL,
+        content=query,
+        task_type="RETRIEVAL_QUERY",
+    )
+    return result["embedding"]
+
+
+def generate_answer(prompt: str) -> str:
+    """Generate a non-streaming answer using the configured Gemini chat model."""
+    model = genai.GenerativeModel(model_name=settings.GEMINI_CHAT_MODEL)
+    result = model.generate_content(prompt)
+
+    text = getattr(result, "text", None)
+    if isinstance(text, str) and text.strip():
+        return text.strip()
+
+    return "I couldn't find the answer in the selected documents."

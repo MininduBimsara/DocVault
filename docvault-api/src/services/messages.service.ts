@@ -12,6 +12,13 @@ interface MessagePayload {
   id: string;
   role: MessageRole;
   content: string;
+  sources?: Array<{
+    docId: string;
+    fileName: string;
+    page?: number;
+    chunkId?: string;
+    snippet?: string;
+  }>;
   createdAt: unknown;
 }
 
@@ -20,6 +27,13 @@ interface CreateMessageInput {
   sessionId: string;
   role: MessageRole;
   content: string;
+  sources?: Array<{
+    docId: string;
+    fileName: string;
+    page?: number;
+    chunkId?: string;
+    snippet?: string;
+  }>;
 }
 
 function makeError(statusCode: number, message: string) {
@@ -33,6 +47,13 @@ function toMessagePayload(message: any): MessagePayload {
     id: String(message._id),
     role: message.role,
     content: message.content,
+    sources: (message.sources ?? []).map((source: any) => ({
+      docId: String(source.docId),
+      fileName: source.fileName,
+      page: source.page,
+      chunkId: source.chunkId,
+      snippet: source.snippet,
+    })),
     createdAt: message.createdAt,
   };
 }
@@ -54,6 +75,7 @@ export async function createSessionMessage(
     sessionId: input.sessionId,
     role: input.role,
     content: input.content,
+    sources: input.sources,
   });
 
   await touchSessionUpdatedAtForUser(input.sessionId, input.userId);

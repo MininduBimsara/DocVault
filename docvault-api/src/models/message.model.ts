@@ -5,11 +5,12 @@ import { WithTimestamps } from "../types/mongo";
 
 export type MessageRole = "user" | "assistant" | "system";
 
-export interface IMessageCitation {
+export interface IMessageSource {
   docId: Types.ObjectId;
   fileName: string;
   page?: number;
   chunkId?: string;
+  snippet?: string;
 }
 
 export interface IMessageMeta {
@@ -23,18 +24,19 @@ export interface IMessage extends Document, WithTimestamps {
   sessionId: Types.ObjectId;
   role: MessageRole;
   content: string;
-  citations?: IMessageCitation[];
+  sources?: IMessageSource[];
   meta?: IMessageMeta;
 }
 
 // ── Sub-schemas ───────────────────────────────────────────────────────────────
 
-const CitationSchema = new Schema<IMessageCitation>(
+const SourceSchema = new Schema<IMessageSource>(
   {
     docId: { type: Schema.Types.ObjectId, ref: "Document", required: true },
     fileName: { type: String, required: true },
     page: Number,
     chunkId: String,
+    snippet: String,
   },
   { _id: false },
 );
@@ -70,8 +72,8 @@ const MessageSchema = new Schema<IMessage>(
       type: String,
       required: true,
     },
-    citations: {
-      type: [CitationSchema],
+    sources: {
+      type: [SourceSchema],
       default: undefined, // omit field entirely if not provided
     },
     meta: {
