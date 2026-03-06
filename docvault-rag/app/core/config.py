@@ -1,15 +1,29 @@
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
-import os, pathlib
+import pathlib
 
 
 class Settings(BaseSettings):
+    # ── Server ────────────────────────────────────────────────────────────────
     PORT: int = 8000
-    CHROMA_PATH: str = "./chroma"
-    EMBEDDINGS_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
+
+    # ── Internal auth ─────────────────────────────────────────────────────────
     INTERNAL_RAG_KEY: str = ""
+
+    # ── Storage paths ─────────────────────────────────────────────────────────
     FILE_STORAGE_PATH: str = "../shared-storage"
-    # URL of the Express API service (for webhook callbacks)
+    CHROMA_PATH: str = "./chroma"
+
+    # ── Gemini / Embeddings ───────────────────────────────────────────────────
+    GEMINI_API_KEY: str = ""                           # Required at runtime
+    EMBEDDINGS_MODEL: str = "models/text-embedding-004"
+    EMBED_BATCH_SIZE: int = 25                         # chunks per Gemini call
+    EMBED_BATCH_DELAY_MS: int = 200                    # ms delay between batches
+
+    # ── PDF processing ────────────────────────────────────────────────────────
+    MIN_PAGE_CHARS: int = 50                           # skip pages below this
+
+    # ── Express API (webhook target) ──────────────────────────────────────────
     API_SERVICE_URL: str = "http://localhost:4000"
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
