@@ -16,7 +16,9 @@ class Settings(BaseSettings):
 
     # ── Gemini / Embeddings ───────────────────────────────────────────────────
     GEMINI_API_KEY: str = ""                           # Required at runtime
-    EMBEDDINGS_MODEL: str = "models/text-embedding-004"
+    EMBEDDINGS_PROVIDER: str = "huggingface"
+    EMBEDDINGS_MODEL: str = "models/embedding-001"
+    HF_EMBEDDINGS_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     GEMINI_CHAT_MODEL: str = "models/gemini-1.5-flash"
     EMBED_BATCH_SIZE: int = 25                         # chunks per Gemini call
     EMBED_BATCH_DELAY_MS: int = 200                    # ms delay between batches

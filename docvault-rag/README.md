@@ -1,6 +1,6 @@
 # docvault-rag
 
-FastAPI RAG pipeline service: PDF ingestion, Gemini embeddings, and Chroma vector store.
+FastAPI RAG pipeline service: PDF ingestion, pluggable embeddings (Hugging Face or Gemini), and Chroma vector store.
 
 ## Prerequisites
 
@@ -32,20 +32,22 @@ copy .env.example .env            # Windows
 
 ## Environment Variables
 
-| Variable               | Default                     | Description                                     |
-| ---------------------- | --------------------------- | ----------------------------------------------- |
-| `PORT`                 | `8000`                      | FastAPI listen port                             |
-| `INTERNAL_RAG_KEY`     | _(required)_                | Shared secret — must match docvault-api         |
-| `FILE_STORAGE_PATH`    | `../shared-storage`         | Path to the shared PDF storage (repo-relative)  |
-| `CHROMA_PATH`          | `./chroma`                  | Local Chroma persistent store directory         |
-| `GEMINI_API_KEY`       | _(required)_                | Google Gemini API key                           |
-| `EMBEDDINGS_MODEL`     | `models/text-embedding-004` | Gemini embedding model                          |
-| `GEMINI_CHAT_MODEL`    | `models/gemini-1.5-flash`   | Gemini model used to generate chat answers      |
-| `EMBED_BATCH_SIZE`     | `25`                        | Chunks per Gemini embedding call                |
-| `EMBED_BATCH_DELAY_MS` | `200`                       | Milliseconds between embedding batches          |
-| `RETRIEVAL_TOP_K`      | `5`                         | Number of retrieved chunks for `/rag/chat`      |
-| `MIN_PAGE_CHARS`       | `50`                        | Skip PDF pages with fewer characters than this  |
-| `API_SERVICE_URL`      | `http://localhost:4000`     | Express base URL for progress webhook callbacks |
+| Variable               | Default                                  | Description                                     |
+| ---------------------- | ---------------------------------------- | ----------------------------------------------- |
+| `PORT`                 | `8000`                                   | FastAPI listen port                             |
+| `INTERNAL_RAG_KEY`     | _(required)_                             | Shared secret — must match docvault-api         |
+| `FILE_STORAGE_PATH`    | `../shared-storage`                      | Path to the shared PDF storage (repo-relative)  |
+| `CHROMA_PATH`          | `./chroma`                               | Local Chroma persistent store directory         |
+| `GEMINI_API_KEY`       | _(required)_                             | Google Gemini API key                           |
+| `EMBEDDINGS_PROVIDER`  | `huggingface`                            | Embedding backend (`huggingface` or `gemini`)   |
+| `EMBEDDINGS_MODEL`     | `models/embedding-001`                   | Gemini embedding model (if provider is gemini)  |
+| `HF_EMBEDDINGS_MODEL`  | `sentence-transformers/all-MiniLM-L6-v2` | Hugging Face model (if provider is huggingface) |
+| `GEMINI_CHAT_MODEL`    | `models/gemini-1.5-flash`                | Gemini model used to generate chat answers      |
+| `EMBED_BATCH_SIZE`     | `25`                                     | Chunks per Gemini embedding call                |
+| `EMBED_BATCH_DELAY_MS` | `200`                                    | Milliseconds between embedding batches          |
+| `RETRIEVAL_TOP_K`      | `5`                                      | Number of retrieved chunks for `/rag/chat`      |
+| `MIN_PAGE_CHARS`       | `50`                                     | Skip PDF pages with fewer characters than this  |
+| `API_SERVICE_URL`      | `http://localhost:4000`                  | Express base URL for progress webhook callbacks |
 
 ---
 
@@ -113,7 +115,7 @@ Retrieval is always filtered by both `userId` and `docIds` before generation.
 
 ```
 PDF file → PyMuPDF extraction → text cleaning → LangChain chunking
-       → Gemini embed_content (batched) → Chroma upsert
+      → Embeddings provider (Hugging Face/Gemini) → Chroma upsert
        → POST /internal/docs/:docId/progress (Express webhook)
 ```
 

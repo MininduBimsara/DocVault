@@ -12,7 +12,7 @@ import logging
 import traceback
 
 from app.core.chroma import get_collection
-from app.core.gemini import embed_texts
+from app.core.embeddings import embed_texts
 from app.core.notify import post_progress
 from app.services.pdf_loader import load_pdf
 from app.services.text_cleaner import build_page_filter, clean_text

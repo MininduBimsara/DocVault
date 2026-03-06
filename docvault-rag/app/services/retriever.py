@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
 from app.core.chroma import get_collection
-from app.core.gemini import embed_query
+from app.core.embeddings import embed_query
 
 
 @dataclass

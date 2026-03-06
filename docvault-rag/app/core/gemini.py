@@ -7,6 +7,7 @@ Includes exponential back-off for rate-limit errors (up to 3 retries).
 
 import asyncio
 import logging
+from typing import Any
 
 import google.generativeai as genai
 
@@ -17,14 +18,109 @@ logger = logging.getLogger(__name__)
 # Configure the SDK once when the module is imported
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
+_resolved_embedding_model: str | None = None
+
+
+def _build_embedding_candidates() -> list[str]:
+    configured = settings.EMBEDDINGS_MODEL.strip()
+    raw = configured.removeprefix("models/")
+
+    candidates = [
+        configured,
+        f"models/{raw}",
+        raw,
+        "models/embedding-001",
+        "embedding-001",
+    ]
+
+    # keep order, remove duplicates / empty values
+    deduped: list[str] = []
+    for candidate in candidates:
+        if candidate and candidate not in deduped:
+            deduped.append(candidate)
+    return deduped
+
+
+def _is_model_unavailable_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return (
+        "is not found" in msg
+        or "not supported for embedcontent" in msg
+        or "404" in msg
+    )
+
+
+def _discover_models_from_api() -> list[str]:
+    try:
+        models = genai.list_models()
+    except Exception:
+        return []
+
+    discovered: list[str] = []
+    for model in models:
+        methods = getattr(model, "supported_generation_methods", []) or []
+        if "embedContent" in methods:
+            name = getattr(model, "name", "")
+            if name and name not in discovered:
+                discovered.append(name)
+    return discovered
+
+
+def _embed_content_with_fallback(content: Any, task_type: str) -> dict[str, Any]:
+    global _resolved_embedding_model
+
+    if _resolved_embedding_model:
+        return genai.embed_content(
+            model=_resolved_embedding_model,
+            content=content,
+            task_type=task_type,
+        )
+
+    candidates = _build_embedding_candidates()
+    discovered = _discover_models_from_api()
+    for model_name in discovered:
+        if model_name not in candidates:
+            candidates.append(model_name)
+
+    last_exc: Exception | None = None
+    for model_name in candidates:
+        try:
+            result = genai.embed_content(
+                model=model_name,
+                content=content,
+                task_type=task_type,
+            )
+            _resolved_embedding_model = model_name
+            logger.info(
+                "[gemini] using embedding model: %s (configured=%s)",
+                model_name,
+                settings.EMBEDDINGS_MODEL,
+            )
+            return result
+        except Exception as exc:
+            last_exc = exc
+            if _is_model_unavailable_error(exc):
+                logger.warning(
+                    "[gemini] embedding model unavailable: %s (%s)",
+                    model_name,
+                    exc,
+                )
+                continue
+            raise
+
+    raise RuntimeError(
+        "No usable Gemini embedding model found. "
+        f"Configured='{settings.EMBEDDINGS_MODEL}'. "
+        f"Last error: {last_exc}"
+    )
+
 
 def _embed_batch_sync(texts: list[str]) -> list[list[float]]:
     """
     Synchronous call to Gemini embed_content for a single batch.
     Returns a list of embedding vectors (one per text).
     """
-    result = genai.embed_content(
-        model=settings.EMBEDDINGS_MODEL,
+    result = _embed_content_with_fallback(
         content=texts,
         task_type="RETRIEVAL_DOCUMENT",
     )
@@ -85,8 +181,7 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
 
 def embed_query(query: str) -> list[float]:
     """Embed one retrieval query using Gemini RETRIEVAL_QUERY mode."""
-    result = genai.embed_content(
-        model=settings.EMBEDDINGS_MODEL,
+    result = _embed_content_with_fallback(
         content=query,
         task_type="RETRIEVAL_QUERY",
     )
