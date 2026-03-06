@@ -1,4 +1,6 @@
 from app.core.gemini import generate_answer
+from langchain_core.prompts import PromptTemplate
+
 from app.schemas.rag_chat import ChatHistoryItem
 from app.services.retriever import RetrievedChunk
 
@@ -35,7 +37,8 @@ def generate_context_only_answer(
     history: list[ChatHistoryItem],
     chunks: list[RetrievedChunk],
 ) -> str:
-    prompt = f"""
+    template = PromptTemplate.from_template(
+        """
 You are DocVault Assistant.
 
 Rules:
@@ -47,14 +50,21 @@ Rules:
 5) When possible, mention supporting source markers like [Source 1], [Source 2].
 
 Conversation history:
-{_format_history(history)}
+{history_text}
 
 Question:
-{question}
+{question_text}
 
 CONTEXT:
-{_format_context(chunks)}
+{context_text}
 """.strip()
+    )
+
+    prompt = template.format(
+        history_text=_format_history(history),
+        question_text=question,
+        context_text=_format_context(chunks),
+    )
 
     answer = generate_answer(prompt)
     normalized = _normalize_whitespace(answer)

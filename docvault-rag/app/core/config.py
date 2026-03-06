@@ -14,13 +14,11 @@ class Settings(BaseSettings):
     FILE_STORAGE_PATH: str = "../shared-storage"
     CHROMA_PATH: str = "./chroma"
 
-    # ── Gemini / Embeddings ───────────────────────────────────────────────────
+    # ── Gemini chat / Hugging Face embeddings ────────────────────────────────
     GEMINI_API_KEY: str = ""                           # Required at runtime
-    EMBEDDINGS_PROVIDER: str = "huggingface"
-    EMBEDDINGS_MODEL: str = "models/embedding-001"
     HF_EMBEDDINGS_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     GEMINI_CHAT_MODEL: str = "models/gemini-1.5-flash"
-    EMBED_BATCH_SIZE: int = 25                         # chunks per Gemini call
+    EMBED_BATCH_SIZE: int = 25                         # chunks per embedding batch
     EMBED_BATCH_DELAY_MS: int = 200                    # ms delay between batches
     RETRIEVAL_TOP_K: int = 5
 

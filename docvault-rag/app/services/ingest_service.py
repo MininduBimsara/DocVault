@@ -1,7 +1,7 @@
 """
 Ingestion service — orchestrates the full pipeline:
 
-    Load PDF → Clean text → Chunk → Embed (Gemini) → Upsert (Chroma) → Notify
+    Load PDF → Clean text → Chunk → Embed (Hugging Face) → Upsert (Chroma) → Notify
 
 Progress is reported to Express at each major stage via the notify module.
 All errors are caught and reported as FAILED so the pipeline never silently dies.
@@ -113,8 +113,7 @@ async def run_ingestion(
                 chunks_done, chunks_total, doc_id,
             )
 
-            # Small delay between batches (already handled inside gemini.py for
-            # back-off, but we add it here for ingest-level pacing too)
+            # Small delay between batches for ingest-level pacing.
             if batch_start + batch_size < chunks_total:
                 await asyncio.sleep(delay_s)
 

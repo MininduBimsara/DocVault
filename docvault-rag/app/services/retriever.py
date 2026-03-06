@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 
-from app.core.chroma import get_collection
+from langchain_chroma import Chroma
+
+from app.core.chroma import COLLECTION_NAME, get_chroma_client
 from app.core.embeddings import embed_query
 
 
@@ -39,7 +41,11 @@ def retrieve_chunks(
     if not doc_ids:
         return []
 
-    collection = get_collection()
+    vector_store = Chroma(
+        client=get_chroma_client(),
+        collection_name=COLLECTION_NAME,
+        embedding_function=None,
+    )
     query_vector = embed_query(query)
 
     where_filter: dict[str, object] = {
@@ -49,26 +55,19 @@ def retrieve_chunks(
         ]
     }
 
-    results = collection.query(
-        query_embeddings=[query_vector],
-        n_results=top_k,
-        where=where_filter,
-        include=["documents", "metadatas"],
+    docs = vector_store.similarity_search_by_vector(
+        embedding=query_vector,
+        k=top_k,
+        filter=where_filter,
     )
-
-    documents_rows = results.get("documents") or []
-    metadatas_rows = results.get("metadatas") or []
-
-    if not documents_rows or not metadatas_rows:
-        return []
-
-    documents = documents_rows[0] if isinstance(documents_rows[0], list) else []
-    metadatas = metadatas_rows[0] if isinstance(metadatas_rows[0], list) else []
 
     chunks: list[RetrievedChunk] = []
 
-    for text, metadata in zip(documents, metadatas):
-        if not isinstance(text, str):
+    for doc in docs:
+        text = doc.page_content
+        metadata = doc.metadata
+
+        if not isinstance(text, str) or not text.strip():
             continue
         if not isinstance(metadata, dict):
             continue
