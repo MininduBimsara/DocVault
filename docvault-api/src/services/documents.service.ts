@@ -11,7 +11,7 @@ import {
   ensureUserDir,
   removeFileSafe,
 } from "../utils/fileStorage";
-import { triggerIngest } from "../clients/rag.client";
+import { triggerIngest, deleteEmbeddings } from "../clients/rag.client";
 
 // ── Upload ────────────────────────────────────────────────────────────────────
 
@@ -36,18 +36,13 @@ export async function uploadDocument(
   progress: object;
   createdAt: unknown;
 }> {
-  // Step 1 — generate the _id upfront so the path is deterministic
   const docId = new Types.ObjectId();
   const docIdStr = String(docId);
   const filePath = resolveDocPath(userId, docIdStr);
 
-  // Step 2 — ensure user's directory exists (idempotent)
   await ensureUserDir(userId);
-
-  // Step 3 — write PDF buffer to disk
   await fs.writeFile(filePath, file.buffer);
 
-  // Step 4 — persist the DB record with the real storage.path
   const doc = await createDoc({
     docId,
     userId,
@@ -56,7 +51,6 @@ export async function uploadDocument(
     storage: { provider: "local", path: filePath },
   });
 
-  // Step 5 — set mimeType and sizeBytes
   await doc.updateOne({
     $set: {
       mimeType: file.mimetype,
@@ -65,7 +59,6 @@ export async function uploadDocument(
     },
   });
 
-  // Step 6 — trigger FastAPI ingestion
   try {
     await triggerIngest({
       userId,
@@ -74,7 +67,6 @@ export async function uploadDocument(
       fileName: file.originalname,
     });
 
-    // FastAPI accepted the job — mark as PROCESSING
     await doc.updateOne({
       $set: {
         status: "PROCESSING",
@@ -92,15 +84,12 @@ export async function uploadDocument(
       createdAt: (doc as any).createdAt,
     };
   } catch (err: unknown) {
-    // Log error details — but never leak INTERNAL_RAG_KEY
     const message = err instanceof Error ? err.message : String(err);
     console.error(
       `[upload] ingestion trigger failed docId=${docIdStr}: ${message}`,
     );
 
-    // ── Rollback: remove the orphaned file and DB record ──────────────────
-    // Without this, every failed upload leaves a ghost UPLOADED document
-    // with no active ingestion pipeline attached to it.
+    // Rollback: remove the orphaned file and DB record
     try {
       await removeFileSafe(filePath);
       await deleteDoc(docIdStr);
@@ -111,7 +100,6 @@ export async function uploadDocument(
       console.error(`[upload] rollback failed docId=${docIdStr}:`, rollbackErr);
     }
 
-    // Attach a 502 status code so the controller can surface it cleanly
     const upstream: any = new Error("Ingestion service unavailable.");
     upstream.statusCode = 502;
     throw upstream;
@@ -120,10 +108,6 @@ export async function uploadDocument(
 
 // ── List ──────────────────────────────────────────────────────────────────────
 
-/**
- * Returns all documents owned by the user (newest first).
- * The repository projection never includes storage.path.
- */
 export async function listDocuments(userId: string) {
   const docs = await findDocsByUser(userId);
   return docs.map((d) => ({
@@ -138,14 +122,13 @@ export async function listDocuments(userId: string) {
 // ── Delete ────────────────────────────────────────────────────────────────────
 
 /**
- * Validates ownership, removes the PDF from disk, then deletes the DB record.
- * Throws a 404 error if the document is not found or doesn't belong to the user.
+ * Validates ownership, removes the PDF from disk, deletes vector embeddings
+ * from PGVector, then deletes the DB record.
  */
 export async function deleteDocument(
   userId: string,
   docId: string,
 ): Promise<void> {
-  // Ownership check — findDocById already filters by userId (multi-tenancy guard)
   const doc = await findDocById(docId, userId);
 
   if (!doc) {
@@ -159,8 +142,11 @@ export async function deleteDocument(
     await removeFileSafe(doc.storage.path);
   }
 
-  // TODO: Later: call RAG service to delete embeddings
+  // Delete vector embeddings from PGVector (non-fatal — warns on failure)
+  await deleteEmbeddings(docId);
 
   // Hard-delete DB record
   await deleteDoc(docId);
+
+  console.log(`[delete] docId=${docId} removed (file + embeddings + DB)`);
 }

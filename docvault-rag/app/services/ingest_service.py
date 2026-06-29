@@ -1,7 +1,7 @@
 """
 Ingestion service — orchestrates the full pipeline:
 
-    Load PDF → Clean text → Chunk → Embed (Hugging Face) → Upsert (Chroma) → Notify
+    Load PDF → Clean text → Chunk → Embed (Hugging Face) → Upsert (PGVector) → Notify
 
 Progress is reported to Express at each major stage via the notify module.
 All errors are caught and reported as FAILED so the pipeline never silently dies.
@@ -10,15 +10,58 @@ All errors are caught and reported as FAILED so the pipeline never silently dies
 import asyncio
 import logging
 import traceback
+from typing import Any
 
-from app.core.chroma import get_collection
+import numpy as np
+
 from app.core.embeddings import embed_texts
 from app.core.notify import post_progress
+from app.core.pgvector_db import get_conn
 from app.services.pdf_loader import load_pdf
 from app.services.text_cleaner import build_page_filter, clean_text
 from app.services.chunker import chunk_pages
 
 logger = logging.getLogger(__name__)
+
+
+def _upsert_chunks(
+    chunks: list[dict[str, Any]],
+    all_vectors: list[list[float]],
+    user_id: str,
+    doc_id: str,
+    file_name: str,
+) -> None:
+    """Synchronous PGVector upsert — call via asyncio.to_thread to stay non-blocking."""
+    rows = [
+        (
+            f"{doc_id}_{c['page']}_{c['chunk_index']}",
+            c["text"],
+            np.array(all_vectors[i], dtype=np.float32),
+            user_id,
+            doc_id,
+            file_name,
+            c["page"],
+            c["chunk_index"],
+        )
+        for i, c in enumerate(chunks)
+    ]
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            for (chunk_id, content, embedding, uid, did, fname, page, cidx) in rows:
+                cur.execute(
+                    """
+                    INSERT INTO document_chunks
+                        (id, content, embedding, user_id, doc_id, file_name, page, chunk_index)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (id) DO UPDATE SET
+                        content     = EXCLUDED.content,
+                        embedding   = EXCLUDED.embedding,
+                        file_name   = EXCLUDED.file_name
+                    """,
+                    (chunk_id, content, embedding, uid, did, fname, page, cidx),
+                )
+        conn.commit()
 
 
 async def run_ingestion(
@@ -35,7 +78,7 @@ async def run_ingestion(
       2. Clean each page (whitespace, page numbers, repeated headers)
       3. Chunk pages → notify Express {stage=chunk}
       4. Embed chunks in batches → notify Express {stage=embed} after each batch
-      5. Upsert to Chroma with deterministic IDs {docId}_{page}_{chunkIndex}
+      5. Upsert to PGVector with deterministic IDs {docId}_{page}_{chunkIndex}
       6. Notify Express {stage=done, status=READY}
 
     On any exception:
@@ -113,39 +156,16 @@ async def run_ingestion(
                 chunks_done, chunks_total, doc_id,
             )
 
-            # Small delay between batches for ingest-level pacing.
             if batch_start + batch_size < chunks_total:
                 await asyncio.sleep(delay_s)
 
-        # ── 5. Upsert to Chroma ───────────────────────────────────────────────
-        collection = get_collection()
-
-        ids = [
-            f"{doc_id}_{c['page']}_{c['chunk_index']}"
-            for c in chunks
-        ]
-        documents = [c["text"] for c in chunks]
-        metadatas = [
-            {
-                "userId": user_id,
-                "docId": doc_id,
-                "fileName": file_name,
-                "page": c["page"],
-                "chunkIndex": c["chunk_index"],
-            }
-            for c in chunks
-        ]
-
-        # upsert is idempotent: same IDs → overwrite, new IDs → insert
-        collection.upsert(
-            ids=ids,
-            documents=documents,
-            embeddings=all_vectors,
-            metadatas=metadatas,
+        # ── 5. Upsert to PGVector ─────────────────────────────────────────────
+        await asyncio.to_thread(
+            _upsert_chunks, chunks, all_vectors, user_id, doc_id, file_name
         )
 
         logger.info(
-            "[ingest_service] upserted %d chunks to Chroma docId=%s",
+            "[ingest_service] upserted %d chunks to PGVector docId=%s",
             chunks_total, doc_id,
         )
 
@@ -160,14 +180,12 @@ async def run_ingestion(
         logger.info("[ingest_service] DONE docId=%s → READY", doc_id)
 
     except Exception as exc:
-        # Log the full traceback locally for debugging
         logger.error(
             "[ingest_service] FAILED docId=%s\n%s",
             doc_id,
             traceback.format_exc(),
         )
 
-        # Report failure to Express
         short_msg = f"{type(exc).__name__}: {exc}"[:300]
         await post_progress(doc_id, {
             "stage": "failed",

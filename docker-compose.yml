@@ -1,0 +1,40 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL 16 with pgvector extension ─────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: docvault-postgres
+    environment:
+      POSTGRES_USER: docvault
+      POSTGRES_PASSWORD: docvault_password
+      POSTGRES_DB: docvault
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U docvault -d docvault"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── MongoDB 7 (document metadata, users, sessions, messages) ──────────────────
+  mongodb:
+    image: mongo:7
+    container_name: docvault-mongo
+    environment:
+      MONGO_INITDB_DATABASE: docvault
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres_data:
+  mongo_data:

@@ -12,7 +12,9 @@ class Settings(BaseSettings):
 
     # ── Storage paths ─────────────────────────────────────────────────────────
     FILE_STORAGE_PATH: str = "../shared-storage"
-    CHROMA_PATH: str = "./chroma"
+
+    # ── PostgreSQL + pgvector ─────────────────────────────────────────────────
+    POSTGRES_URL: str = "postgresql://docvault:docvault_password@localhost:5432/docvault"
 
     # ── Gemini chat / Hugging Face embeddings ────────────────────────────────
     GEMINI_API_KEY: str = ""                           # Required at runtime
@@ -36,12 +38,6 @@ class Settings(BaseSettings):
         """Resolve relative path to absolute from the project root."""
         base = pathlib.Path(__file__).resolve().parent.parent.parent  # repo root
         return str((base / v).resolve())
-
-    @field_validator("CHROMA_PATH", mode="before")
-    @classmethod
-    def resolve_chroma_path(cls, v: str) -> str:
-        base = pathlib.Path(__file__).resolve().parent.parent.parent
-        return str((base / "docvault-rag" / v).resolve())
 
 
 settings = Settings()
