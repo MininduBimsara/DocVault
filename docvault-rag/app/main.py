@@ -30,13 +30,13 @@ async def lifespan(app: FastAPI):
     pg_host = settings.POSTGRES_URL.split("@")[-1] if "@" in settings.POSTGRES_URL else settings.POSTGRES_URL
 
     print("")
-    print("┌────────────────────────────────────────────────────┐")
-    print("│             docvault-rag  ✓  RUNNING               │")
-    print("├────────────────────────────────────────────────────┤")
-    print(f"│  URL           http://localhost:{settings.PORT}             │")
-    print(f"│  PGVector      {pg_host[-34:]:<34} │")
-    print(f"│  File Storage  {str(settings.FILE_STORAGE_PATH)[-34:]:<34} │")
-    print("└────────────────────────────────────────────────────┘")
+    print("+----------------------------------------------------+")
+    print("|             docvault-rag  [ OK ] RUNNING           |")
+    print("+----------------------------------------------------+")
+    print(f"|  URL           http://localhost:{settings.PORT}             |")
+    print(f"|  PGVector      {pg_host[-34:]:<34} |")
+    print(f"|  File Storage  {str(settings.FILE_STORAGE_PATH)[-34:]:<34} |")
+    print("+----------------------------------------------------+")
     print("")
 
     yield  # application is running here

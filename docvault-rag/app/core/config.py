@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # ── Gemini chat / Hugging Face embeddings ────────────────────────────────
     GEMINI_API_KEY: str = ""                           # Required at runtime
     HF_EMBEDDINGS_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
-    GEMINI_CHAT_MODEL: str = "models/gemini-1.5-flash"
+    GEMINI_CHAT_MODEL: str = "gemini-2.5-flash"
     EMBED_BATCH_SIZE: int = 25                         # chunks per embedding batch
     EMBED_BATCH_DELAY_MS: int = 200                    # ms delay between batches
     RETRIEVAL_TOP_K: int = 5
