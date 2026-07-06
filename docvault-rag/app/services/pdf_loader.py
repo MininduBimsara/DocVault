@@ -47,11 +47,15 @@ def load_pdf(file_path: str) -> list[dict]:
     except Exception as exc:
         raise RuntimeError(f"PyMuPDF could not open {file_path}: {exc}") from exc
 
+    if doc.is_encrypted:
+        raise ValueError(f"The PDF file '{path.name}' is encrypted or password-protected and cannot be parsed.")
+
     pages: list[dict] = []
     total = len(doc)
 
     for i, page in enumerate(doc):
-        text = page.get_text("text")
+        # sort=True ensures text is extracted in logical reading order (handling multi-column PDFs)
+        text = page.get_text("text", sort=True)
         if not text or len(text.strip()) < settings.MIN_PAGE_CHARS:
             logger.debug(
                 "[pdf_loader] skipping page %d/%d (text_len=%d < MIN_PAGE_CHARS=%d)",

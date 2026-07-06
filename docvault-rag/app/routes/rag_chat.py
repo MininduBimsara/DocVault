@@ -9,4 +9,4 @@ router = APIRouter()
 
 @router.post("/chat", response_model=RagChatResponse, dependencies=[Depends(require_internal_key)])
 async def rag_chat(body: RagChatRequest) -> RagChatResponse:
-    return run_rag_chat(body)
+    return await run_rag_chat(body)

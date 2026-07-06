@@ -1,18 +1,12 @@
 """
 Ingestion service — orchestrates the full pipeline:
-
-    Load PDF → Clean text → Chunk → Embed (Hugging Face) → Upsert (PGVector) → Notify
-
-Progress is reported to Express at each major stage via the notify module.
-All errors are caught and reported as FAILED so the pipeline never silently dies.
+Load PDF → Clean text → Chunk → Embed (Hugging Face) → Upsert (PGVector) → Notify
 """
 
 import asyncio
 import logging
 import traceback
 from typing import Any
-
-import numpy as np
 
 from app.core.embeddings import embed_texts
 from app.core.notify import post_progress
@@ -24,44 +18,52 @@ from app.services.chunker import chunk_pages
 logger = logging.getLogger(__name__)
 
 
-def _upsert_chunks(
+async def _upsert_chunks(
     chunks: list[dict[str, Any]],
     all_vectors: list[list[float]],
     user_id: str,
     doc_id: str,
     file_name: str,
 ) -> None:
-    """Synchronous PGVector upsert — call via asyncio.to_thread to stay non-blocking."""
-    rows = [
-        (
-            f"{doc_id}_{c['page']}_{c['chunk_index']}",
+    """Asynchronously bulk upserts all chunks in a single multi-row query."""
+    if not chunks:
+        return
+
+    values_parts = []
+    params = []
+    
+    param_idx = 1
+    for i, c in enumerate(chunks):
+        chunk_id = f"{doc_id}_{c['page']}_{c['chunk_index']}"
+        values_parts.append(
+            f"(${param_idx}, ${param_idx+1}, ${param_idx+2}::vector, ${param_idx+3}, ${param_idx+4}, ${param_idx+5}, ${param_idx+6}, ${param_idx+7})"
+        )
+        params.extend([
+            chunk_id,
             c["text"],
-            np.array(all_vectors[i], dtype=np.float32),
+            all_vectors[i],  # list of floats, pgvector_db.py converts to string '[...]'
             user_id,
             doc_id,
             file_name,
             c["page"],
-            c["chunk_index"],
-        )
-        for i, c in enumerate(chunks)
-    ]
+            c["chunk_index"]
+        ])
+        param_idx += 8
 
-    with get_conn() as conn:
-        with conn.cursor() as cur:
-            for (chunk_id, content, embedding, uid, did, fname, page, cidx) in rows:
-                cur.execute(
-                    """
-                    INSERT INTO document_chunks
-                        (id, content, embedding, user_id, doc_id, file_name, page, chunk_index)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (id) DO UPDATE SET
-                        content     = EXCLUDED.content,
-                        embedding   = EXCLUDED.embedding,
-                        file_name   = EXCLUDED.file_name
-                    """,
-                    (chunk_id, content, embedding, uid, did, fname, page, cidx),
-                )
-        conn.commit()
+    values_sql = ", ".join(values_parts)
+    sql = f"""
+        INSERT INTO document_chunks
+            (id, content, embedding, user_id, doc_id, file_name, page, chunk_index)
+        VALUES {values_sql}
+        ON CONFLICT (id) DO UPDATE SET
+            content     = EXCLUDED.content,
+            embedding   = EXCLUDED.embedding,
+            file_name   = EXCLUDED.file_name
+    """
+
+    async with get_conn() as conn:
+        async with conn.cursor() as cur:
+            await cur.execute(sql, params)
 
 
 async def run_ingestion(
@@ -72,18 +74,6 @@ async def run_ingestion(
 ) -> None:
     """
     Full ingestion pipeline for one document. Designed to run as a background task.
-
-    Stages:
-      1. Load PDF pages via PyMuPDF
-      2. Clean each page (whitespace, page numbers, repeated headers)
-      3. Chunk pages → notify Express {stage=chunk}
-      4. Embed chunks in batches → notify Express {stage=embed} after each batch
-      5. Upsert to PGVector with deterministic IDs {docId}_{page}_{chunkIndex}
-      6. Notify Express {stage=done, status=READY}
-
-    On any exception:
-      → Log full traceback locally
-      → Notify Express {stage=failed, status=FAILED, errorMessage=...}
     """
     logger.info(
         "[ingest_service] START docId=%s userId=%s file=%s",
@@ -130,7 +120,10 @@ async def run_ingestion(
         from app.core.config import settings
 
         batch_size = settings.EMBED_BATCH_SIZE
-        delay_s = settings.EMBED_BATCH_DELAY_MS / 1000.0
+        # Skip batch delay for local sentence-transformers to speed up ingestion
+        is_local_model = settings.HF_EMBEDDINGS_MODEL.startswith("sentence-transformers")
+        delay_s = 0.0 if is_local_model else (settings.EMBED_BATCH_DELAY_MS / 1000.0)
+        
         all_vectors: list[list[float]] = []
         chunks_done = 0
 
@@ -156,13 +149,11 @@ async def run_ingestion(
                 chunks_done, chunks_total, doc_id,
             )
 
-            if batch_start + batch_size < chunks_total:
+            if delay_s > 0.0 and batch_start + batch_size < chunks_total:
                 await asyncio.sleep(delay_s)
 
         # ── 5. Upsert to PGVector ─────────────────────────────────────────────
-        await asyncio.to_thread(
-            _upsert_chunks, chunks, all_vectors, user_id, doc_id, file_name
-        )
+        await _upsert_chunks(chunks, all_vectors, user_id, doc_id, file_name)
 
         logger.info(
             "[ingest_service] upserted %d chunks to PGVector docId=%s",

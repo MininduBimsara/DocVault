@@ -7,34 +7,27 @@ import importlib
 import logging
 from typing import Any
 
+from langchain_huggingface import HuggingFaceEmbeddings
+
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-_embedding_model: Any | None = None
+_embedding_model: HuggingFaceEmbeddings | None = None
 
 
-def _get_embedding_model() -> Any:
+def _get_embedding_model() -> HuggingFaceEmbeddings:
     global _embedding_model
 
     if _embedding_model is not None:
         return _embedding_model
 
-    try:
-        huggingface_module = importlib.import_module("langchain_huggingface")
-        huggingface_embeddings_cls = getattr(huggingface_module, "HuggingFaceEmbeddings")
-    except Exception as exc:
-        raise RuntimeError(
-            "Hugging Face embeddings require langchain-huggingface. "
-            "Install with: pip install langchain-huggingface"
-        ) from exc
-
     model_name = settings.HF_EMBEDDINGS_MODEL.strip()
-    logger.info("[embeddings] loading Hugging Face model via LangChain: %s", model_name)
-    _embedding_model = huggingface_embeddings_cls(
+    logger.info("[embeddings] loading Hugging Face model via LangChain: %s on device: %s", model_name, settings.EMBEDDING_DEVICE)
+    _embedding_model = HuggingFaceEmbeddings(
         model_name=model_name,
         encode_kwargs={"normalize_embeddings": True},
-        model_kwargs={},
+        model_kwargs={"device": settings.EMBEDDING_DEVICE},
     )
     return _embedding_model
 
@@ -56,5 +49,7 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     return await asyncio.get_event_loop().run_in_executor(None, _embed_texts_sync, texts)
 
 
-def embed_query(query: str) -> list[float]:
-    return _embed_query_sync(query)
+async def embed_query(query: str) -> list[float]:
+    if not query:
+        return []
+    return await asyncio.get_event_loop().run_in_executor(None, _embed_query_sync, query)

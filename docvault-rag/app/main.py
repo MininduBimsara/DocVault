@@ -25,7 +25,7 @@ async def lifespan(app: FastAPI):
         print(f"[docvault-rag] Shared storage path OK: {storage}")
 
     # ── Initialize PGVector table and indices ─────────────────────────────────
-    init_db()
+    await init_db()
 
     pg_host = settings.POSTGRES_URL.split("@")[-1] if "@" in settings.POSTGRES_URL else settings.POSTGRES_URL
 
@@ -42,6 +42,13 @@ async def lifespan(app: FastAPI):
     yield  # application is running here
 
     print("[docvault-rag] Shutting down...")
+    
+    # ── Safe cleanup of connection pools ──────────────────────────────────────
+    from app.core.notify import close_notify_client
+    from app.core.pgvector_db import close_db_client
+    
+    await close_notify_client()
+    await close_db_client()
 
 
 # ── App factory ───────────────────────────────────────────────────────────────

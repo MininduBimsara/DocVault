@@ -20,9 +20,15 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""                           # Required at runtime
     HF_EMBEDDINGS_MODEL: str = "sentence-transformers/all-MiniLM-L6-v2"
     GEMINI_CHAT_MODEL: str = "gemini-2.5-flash"
+    EMBEDDING_DEVICE: str = "cpu"                      # cpu or cuda
     EMBED_BATCH_SIZE: int = 25                         # chunks per embedding batch
     EMBED_BATCH_DELAY_MS: int = 200                    # ms delay between batches
     RETRIEVAL_TOP_K: int = 5
+    SIMILARITY_THRESHOLD: float = 0.10                 # cosine similarity threshold (1 - distance)
+
+    # ── Text chunking ────────────────────────────────────────────────────────
+    CHUNK_SIZE: int = 500                              # target tokens per chunk
+    CHUNK_OVERLAP: int = 50                            # token overlap between chunks
 
     # ── PDF processing ────────────────────────────────────────────────────────
     MIN_PAGE_CHARS: int = 50                           # skip pages below this

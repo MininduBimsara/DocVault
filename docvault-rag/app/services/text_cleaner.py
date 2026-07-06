@@ -41,33 +41,53 @@ def _strip_page_numbers(text: str) -> str:
 def build_page_filter(pages: list[dict]) -> set[str]:
     """
     Given extracted pages (list of {"page": int, "text": str}),
-    return a set of line strings that appear on > 70% of pages.
-    These are treated as repeated headers/footers and will be stripped.
+    return a set of line strings that appear on > 70% of odd pages OR > 70% of even pages.
+    This safely strips alternating left-right page headers and footers.
 
-    Only considers lines shorter than 80 characters (to avoid stripping
-    actual content that happens to repeat).
+    Only considers lines shorter than 80 characters.
     """
     total_pages = len(pages)
     if total_pages < 3:
         return set()  # not enough pages to reliably detect headers/footers
 
-    line_counts: Counter = Counter()
+    odd_pages = [p for p in pages if p["page"] % 2 != 0]
+    even_pages = [p for p in pages if p["page"] % 2 == 0]
+
+    odd_counts: Counter = Counter()
+    even_counts: Counter = Counter()
     threshold = 0.70
 
-    for p in pages:
-        # Deduplicate lines per page before counting
+    for p in odd_pages:
         page_lines = {ln.strip() for ln in p["text"].splitlines() if ln.strip()}
         for ln in page_lines:
             if len(ln) < 80:
-                line_counts[ln] += 1
+                odd_counts[ln] += 1
 
-    repeated: set[str] = {
-        ln for ln, count in line_counts.items()
-        if count / total_pages > threshold
-    }
+    for p in even_pages:
+        page_lines = {ln.strip() for ln in p["text"].splitlines() if ln.strip()}
+        for ln in page_lines:
+            if len(ln) < 80:
+                even_counts[ln] += 1
+
+    repeated: set[str] = set()
+
+    if len(odd_pages) >= 2:
+        repeated.update(
+            ln for ln, count in odd_counts.items()
+            if count / len(odd_pages) > threshold
+        )
+
+    if len(even_pages) >= 2:
+        repeated.update(
+            ln for ln, count in even_counts.items()
+            if count / len(even_pages) > threshold
+        )
 
     if repeated:
-        logger.debug("[text_cleaner] detected %d repeated header/footer lines", len(repeated))
+        logger.debug(
+            "[text_cleaner] detected %d repeated (possibly alternating) header/footer lines",
+            len(repeated),
+        )
 
     return repeated
 
