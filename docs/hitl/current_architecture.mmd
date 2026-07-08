@@ -1,0 +1,30 @@
+graph TD
+    subgraph Frontend ["Frontend (Next.js)"]
+        C[Chat UI] --> R[Redux Store]
+        R --> C[Chat UI]
+        D[Dashboard UI] --> U[Upload PDF]
+    end
+    subgraph Backend ["Backend API (Express)"]
+        E[Express Server] --> M[("MongoDB")]
+        E --> S[Shared Storage]
+    end
+    subgraph RAG ["RAG Service (FastAPI)"]
+        F[FastAPI Server] --> HF[Hugging Face local Embeddings]
+        F --> P[("PostgreSQL + pgvector")]
+        F --> G[Gemini 1.5 Flash]
+    end
+
+    U -->|1. Save file & create DB record| E
+    E -->|2. POST /ingest| F
+    F -->|3. Async Ingestion Tasks| HF
+    HF -->|4. Store embeddings & chunks| P
+    F -->|5. Ingestion progress webhooks| E
+    M -.->|Update document status| E
+    C -->|6. POST /api/chat| E
+    E -->|7. Retrieve chat history| M
+    E -->|8. POST /rag/chat| F
+    F -->|9. Retrieve Top-5 chunks| P
+    F -->|10. Context-bounded prompt| G
+    G -->|11. Generate answer| F
+    F -->|12. Return answer & sources| E
+    E -->|13. Save response & return| C

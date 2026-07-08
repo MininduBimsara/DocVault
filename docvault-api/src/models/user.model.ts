@@ -8,6 +8,7 @@ export interface IUser extends Document, WithTimestamps {
   email: string;
   password: string; // bcrypt-hashed value; field name is intentionally "password"
   plan: "FREE" | "PRO";
+  role: "USER" | "REVIEWER" | "ADMIN";
 }
 
 // ── Schema ────────────────────────────────────────────────────────────────────
@@ -29,6 +30,12 @@ const UserSchema = new Schema<IUser>(
       type: String,
       enum: ["FREE", "PRO"],
       default: "FREE",
+    },
+    role: {
+      type: String,
+      enum: ["USER", "REVIEWER", "ADMIN"],
+      default: "USER",
+      required: true,
     },
   },
   {

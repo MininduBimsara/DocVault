@@ -12,6 +12,7 @@ export interface RagChatSource {
   page?: number;
   chunkId?: string;
   snippet?: string;
+  similarityScore: number;
 }
 
 export interface RagChatRequest {
@@ -24,6 +25,7 @@ export interface RagChatRequest {
 export interface RagChatResponse {
   answer: string;
   sources: RagChatSource[];
+  confidenceScore: number;
 }
 
 const ragAxios = axios.create({
@@ -54,9 +56,12 @@ function parseSource(value: unknown): RagChatSource | null {
     return null;
   }
 
+  const similarityScore = typeof value.similarityScore === "number" ? value.similarityScore : 1.0;
+
   const source: RagChatSource = {
     docId,
     fileName,
+    similarityScore,
   };
 
   if (typeof value.page === "number") source.page = value.page;
@@ -73,7 +78,7 @@ export async function chatWithRag(
     const response = await ragAxios.post("/rag/chat", payload);
     const data = response.data;
 
-    if (!isObject(data) || typeof data.answer !== "string") {
+    if (!isObject(data) || typeof data.answer !== "string" || typeof data.confidenceScore !== "number") {
       throw makeError(502, "Invalid RAG response payload");
     }
 
@@ -85,6 +90,7 @@ export async function chatWithRag(
     return {
       answer: data.answer,
       sources,
+      confidenceScore: data.confidenceScore,
     };
   } catch (err: any) {
     if (err?.statusCode) throw err;

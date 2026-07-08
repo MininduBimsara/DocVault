@@ -59,7 +59,7 @@ const chatSlice = createSlice({
       })
       .addCase(sendChatThunk.fulfilled, (state, action) => {
         state.sending = false;
-        const { sessionId, answer, sources } = action.payload;
+        const { sessionId, answer, sources, status } = action.payload;
 
         if (!state.messagesBySessionId[sessionId]) {
           state.messagesBySessionId[sessionId] = [];
@@ -72,6 +72,7 @@ const chatSlice = createSlice({
           content: answer,
           createdAt: new Date().toISOString(),
           sources,
+          status,
         });
       })
       .addCase(sendChatThunk.rejected, (state, action) => {

@@ -8,6 +8,7 @@ interface MessageSourceInput {
   page?: number;
   chunkId?: string;
   snippet?: string;
+  similarityScore?: number;
 }
 
 interface CreateMessageData {
@@ -16,6 +17,7 @@ interface CreateMessageData {
   role: MessageRole;
   content: string;
   sources?: MessageSourceInput[];
+  status?: "PUBLISHED" | "PENDING_REVIEW" | "REJECTED";
 }
 
 export async function createMessage(data: CreateMessageData) {
@@ -25,6 +27,7 @@ export async function createMessage(data: CreateMessageData) {
     page: source.page,
     chunkId: source.chunkId,
     snippet: source.snippet,
+    similarityScore: source.similarityScore !== undefined ? source.similarityScore : 1.0,
   }));
 
   return Message.create({
@@ -33,6 +36,7 @@ export async function createMessage(data: CreateMessageData) {
     role: data.role,
     content: data.content,
     sources,
+    status: data.status || "PUBLISHED",
   });
 }
 
@@ -40,14 +44,23 @@ export async function listRecentMessagesBySessionForUser(
   userId: string,
   sessionId: string,
   limit: number,
+  includeUnpublished: boolean = false,
 ) {
-  return Message.find({
+  const filter: any = {
     userId: new Types.ObjectId(userId),
     sessionId: new Types.ObjectId(sessionId),
-  })
+  };
+
+  if (!includeUnpublished) {
+    filter.status = "PUBLISHED";
+  } else {
+    filter.status = { $in: ["PUBLISHED", "PENDING_REVIEW"] };
+  }
+
+  return Message.find(filter)
     .sort({ createdAt: -1, _id: -1 })
     .limit(limit)
-    .select("_id role content sources createdAt")
+    .select("_id role content sources status createdAt")
     .lean();
 }
 

@@ -49,8 +49,10 @@ class RagChatSource(BaseModel):
     page: int | None = None
     chunkId: str
     snippet: str | None = None
+    similarityScore: float
 
 
 class RagChatResponse(BaseModel):
     answer: str
     sources: list[RagChatSource]
+    confidenceScore: float

@@ -4,6 +4,7 @@ export interface SourceCitation {
   page?: number;
   chunkId?: string;
   snippet?: string;
+  similarityScore?: number;
 }
 
 export interface Message {
@@ -12,10 +13,12 @@ export interface Message {
   content: string;
   createdAt: string;
   sources?: SourceCitation[];
+  status?: "PUBLISHED" | "PENDING_REVIEW" | "REJECTED";
 }
 
 export interface ChatResponse {
   answer: string;
   sources: SourceCitation[];
   sessionId: string;
+  status: "PUBLISHED" | "PENDING_REVIEW" | "REJECTED";
 }

@@ -19,6 +19,7 @@ class RetrievedChunk:
     page: int | None
     chunk_index: int | None
     chunk_id: str
+    similarity_score: float
 
 
 async def retrieve_chunks(
@@ -92,6 +93,8 @@ async def retrieve_chunks(
         file_name = row[3]
         page = row[4]
         chunk_index = row[5]
+        distance = float(row[6]) if row[6] is not None else 1.0
+        similarity = round(1.0 - distance, 4)
 
         if not isinstance(content, str) or not content.strip():
             continue
@@ -106,6 +109,7 @@ async def retrieve_chunks(
                 page=page,
                 chunk_index=chunk_index,
                 chunk_id=chunk_id,
+                similarity_score=similarity,
             )
         )
 

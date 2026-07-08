@@ -16,6 +16,18 @@ def _build_snippet(text: str, max_len: int = 160) -> str:
     return f"{compact[: max_len - 1]}…"
 
 
+def calculate_confidence(chunks: list, top_k: int) -> float:
+    if not chunks:
+        return 0.0
+    
+    top1_sim = chunks[0].similarity_score
+    avg_sim = sum(c.similarity_score for c in chunks) / len(chunks)
+    density = min(len(chunks), top_k) / top_k
+    
+    score = (0.5 * top1_sim) + (0.3 * avg_sim) + (0.2 * density)
+    return round(max(0.0, min(1.0, score)), 4)
+
+
 def _dedupe_sources(chunks) -> list[RagChatSource]:
     seen: set[str] = set()
     sources: list[RagChatSource] = []
@@ -31,6 +43,7 @@ def _dedupe_sources(chunks) -> list[RagChatSource]:
                 page=chunk.page,
                 chunkId=chunk.chunk_id,
                 snippet=_build_snippet(chunk.text),
+                similarityScore=chunk.similarity_score,
             )
         )
 
@@ -43,6 +56,7 @@ async def run_rag_chat(request: RagChatRequest) -> RagChatResponse:
         return RagChatResponse(
             answer="I can’t answer because no documents are selected for this session.",
             sources=[],
+            confidenceScore=0.0,
         )
 
     # 1. Condense query if conversation history is present
@@ -60,6 +74,7 @@ async def run_rag_chat(request: RagChatRequest) -> RagChatResponse:
         return RagChatResponse(
             answer="I couldn't find the answer in the selected documents.",
             sources=[],
+            confidenceScore=0.0,
         )
 
     # 3. Generate answer asynchronously using original question for instruction context
@@ -69,7 +84,11 @@ async def run_rag_chat(request: RagChatRequest) -> RagChatResponse:
         chunks=chunks,
     )
 
+    confidence = calculate_confidence(chunks, settings.RETRIEVAL_TOP_K)
+
     return RagChatResponse(
         answer=answer,
         sources=_dedupe_sources(chunks),
+        confidenceScore=confidence,
     )
+

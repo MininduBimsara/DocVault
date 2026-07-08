@@ -1,0 +1,23 @@
+graph TD
+    User([User asks question]) --> Query[Condense Query & Search PGVector]
+    Query --> Fetch[Fetch chunks & distances]
+    Fetch --> CalcConf[Calculate Confidence Score]
+    
+    CalcConf --> Choice{Confidence Score}
+    
+    Choice -->|< 0.60| Refuse[Create Message status: PUBLISHED <br/> content: 'I couldn't find enough information...']
+    Refuse --> UserUI[Show response in Chat UI]
+
+    Choice -->|>= 0.85| LLMGen[Generate Answer with Gemini]
+    LLMGen --> AutoPub[Create Message status: PUBLISHED <br/> content: LLM response]
+    AutoPub --> UserUI
+
+    Choice -->|0.60 to 0.84| LLMGenReview[Generate Draft Answer with Gemini]
+    LLMGenReview --> ReviewMsg[Create Message status: PENDING_REVIEW <br/> content: LLM Draft]
+    ReviewMsg --> CreateTask[Create ReviewTask in MongoDB]
+    CreateTask --> UserPending[Show 'Under Review' skeleton in User Chat]
+    
+    CreateTask -.->|Expose in Queue| RevUI[Reviewer Workspace /reviews]
+    RevUI -->|Reviewer approves/edits| RevAction[Update ReviewTask status & finalAnswer]
+    RevAction --> PublishMsg[Update Message status to PUBLISHED <br/> & set content = finalAnswer]
+    PublishMsg -.->|Websocket / SSE / Polling| UserUI

@@ -36,6 +36,7 @@ export async function requireAuth(
       id: String(user._id),
       email: user.email,
       plan: user.plan,
+      role: user.role,
     };
 
     next();

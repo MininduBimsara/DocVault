@@ -22,6 +22,20 @@ export default function ChatThread() {
     }
   }, [activeSession, dispatch]);
 
+  // Poll if there is any message pending review
+  useEffect(() => {
+    if (!activeSession) return;
+    
+    const hasPending = messages.some((msg) => msg.status === "PENDING_REVIEW");
+    if (!hasPending) return;
+
+    const interval = setInterval(() => {
+      dispatch(fetchMessagesThunk(activeSession.id));
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [activeSession, messages, dispatch]);
+
   // Scroll to bottom when messages change
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

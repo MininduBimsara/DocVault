@@ -11,6 +11,7 @@ export interface IMessageSource {
   page?: number;
   chunkId?: string;
   snippet?: string;
+  similarityScore?: number;
 }
 
 export interface IMessageMeta {
@@ -25,6 +26,7 @@ export interface IMessage extends Document, WithTimestamps {
   role: MessageRole;
   content: string;
   sources?: IMessageSource[];
+  status: "PUBLISHED" | "PENDING_REVIEW" | "REJECTED";
   meta?: IMessageMeta;
 }
 
@@ -37,6 +39,7 @@ const SourceSchema = new Schema<IMessageSource>(
     page: Number,
     chunkId: String,
     snippet: String,
+    similarityScore: Number,
   },
   { _id: false },
 );
@@ -75,6 +78,12 @@ const MessageSchema = new Schema<IMessage>(
     sources: {
       type: [SourceSchema],
       default: undefined, // omit field entirely if not provided
+    },
+    status: {
+      type: String,
+      enum: ["PUBLISHED", "PENDING_REVIEW", "REJECTED"],
+      default: "PUBLISHED",
+      required: true,
     },
     meta: {
       type: MetaSchema,

@@ -7,6 +7,7 @@ export interface SafeUser {
   id: string;
   email: string;
   plan: "FREE" | "PRO";
+  role: "USER" | "REVIEWER" | "ADMIN";
 }
 
 declare global {
